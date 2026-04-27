@@ -142,6 +142,9 @@ function DropZoneCard({
       const data = await response.json();
       if (response.ok) {
         setStatusMsg("Upload success!");
+        if (data.data && data.data[0] && data.data[0].extractedText) {
+          sessionStorage.setItem("extractedText", data.data[0].extractedText);
+        }
       } else {
         setStatusMsg(data.message || "Upload failed");
       }
