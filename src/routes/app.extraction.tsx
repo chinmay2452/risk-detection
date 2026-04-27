@@ -5,12 +5,14 @@ import {
   Database,
   GitBranch,
   Globe,
+  Network,
   ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
+import { cn } from "@/lib/utils";
 import { extractedEntities } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/app/extraction")({
@@ -41,11 +43,13 @@ function Extraction() {
     async function performExtraction() {
       try {
         const extractedText = sessionStorage.getItem("extractedText");
+        const inputType = sessionStorage.getItem("inputType") || "text";
+        const filePath = sessionStorage.getItem("filePath");
         if (extractedText) {
           const res = await fetch("http://localhost:5000/api/extract", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ extractedText })
+            body: JSON.stringify({ extractedText, inputType, filePath })
           });
           const json = await res.json();
           if (json.success) {
@@ -57,6 +61,11 @@ function Extraction() {
         }
       } catch (err) {
         console.error("Extraction error:", err);
+        setAiData({
+          error: true,
+          message: "Unable to connect to the AI extraction server. Please ensure the backend is running.",
+          components: [], apis: [], databases: [], user_roles: [], data_flows: [], trust_boundaries: []
+        });
       }
       setDone(true);
     }
@@ -129,6 +138,8 @@ function ExtractionResults({ data }: { data: any }) {
     { title: "Roles", icon: Users, items: data.user_roles || [] },
     { title: "Data flows", icon: GitBranch, items: data.data_flows || [] },
     { title: "Trust boundaries", icon: ShieldCheck, items: data.trust_boundaries || [] },
+    { title: "Sensitive data", icon: Sparkles, items: data.sensitive_data || [] },
+    { title: "External dependencies", icon: Network, items: data.external_dependencies || [] },
   ];
 
   return (
@@ -148,6 +159,102 @@ function ExtractionResults({ data }: { data: any }) {
           Validate model <ArrowRight className="size-4" />
         </Link>
       </div>
+
+      {data.error && (
+        <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
+          <p className="text-sm font-medium text-destructive">{data.message}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 text-xs font-bold uppercase tracking-wider text-primary hover:underline"
+          >
+            Retry Extraction
+          </button>
+        </div>
+      )}
+
+      {data._retryable && (
+        <div className="rounded-xl border border-warning/50 bg-warning/5 p-6 text-center">
+          <p className="text-sm font-medium text-warning">⚠ AI Vision Temporarily Unavailable</p>
+          <p className="mt-2 text-xs text-muted-foreground max-w-lg mx-auto">
+            The Gemini API quota is exhausted. Image diagrams require AI vision for accurate extraction. 
+            You can retry later, or go back and provide a text/JSON description instead.
+          </p>
+          <div className="mt-4 flex justify-center gap-3">
+            <button 
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-warning/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-warning ring-1 ring-warning/30 hover:bg-warning/25 transition-colors"
+            >
+              Retry Now
+            </button>
+            <Link
+              to="/app/input"
+              className="rounded-lg bg-primary/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary ring-1 ring-primary/30 hover:bg-primary/25 transition-colors"
+            >
+              Change Input
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {data.extraction_confidence && (
+        <div className="flex flex-wrap gap-4">
+          <GlassCard className="flex items-center gap-4 px-6 py-3 border-primary/20">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Confidence</div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-24 overflow-hidden rounded-full bg-muted/50">
+                <div 
+                  className={cn(
+                    "h-full rounded-full transition-all duration-1000",
+                    data.extraction_confidence > 80 ? "bg-success" : data.extraction_confidence > 50 ? "bg-warning" : "bg-destructive"
+                  )}
+                  style={{ width: `${data.extraction_confidence}%` }}
+                />
+              </div>
+              <span className="text-sm font-bold font-mono">{data.extraction_confidence}%</span>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="flex items-center gap-4 px-6 py-3 border-secondary/20">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Input Type</div>
+            <div className="text-sm font-bold font-mono uppercase text-secondary">{data.input_type || 'unknown'}</div>
+          </GlassCard>
+
+          {data.missing_parameters && data.missing_parameters.length > 0 && (
+            <GlassCard className="flex items-center gap-4 px-6 py-3 border-warning/20">
+              <div className="text-xs font-semibold uppercase text-muted-foreground">Missing</div>
+              <div className="flex gap-1">
+                {data.missing_parameters.map((p: string) => (
+                  <span key={p} className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-bold text-warning uppercase">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </GlassCard>
+          )}
+        </div>
+      )}
+
+      {data.notes && data.notes.length > 0 && (
+        <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Extraction Notes</p>
+          <ul className="list-inside list-disc space-y-1">
+            {data.notes.map((note: string, i: number) => (
+              <li key={i} className="text-sm text-muted-foreground italic">"{note}"</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {data.corrections_made && data.corrections_made.length > 0 && (
+        <div className="rounded-xl border border-success/30 bg-success/5 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-success mb-2">Corrections Applied</p>
+          <ul className="list-inside list-disc space-y-1">
+            {data.corrections_made.map((c: string, i: number) => (
+              <li key={i} className="text-sm text-success/80">✔ {c}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

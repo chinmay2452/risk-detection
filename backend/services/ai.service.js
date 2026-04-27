@@ -1,63 +1,54 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
+const fs = require('fs');
 
 class AIService {
   constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY;
-    if (this.apiKey && this.apiKey !== 'your_gemini_api_key_here') {
-      this.genAI = new GoogleGenerativeAI(this.apiKey);
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
-    } else {
-      this.genAI = null;
-      this.model = null;
+    this.geminiApiKey = process.env.GEMINI_API_KEY;
+    this.groqApiKey = process.env.GROQ_API_KEY;
+
+    // Gemini Setup
+    if (this.geminiApiKey && !this.geminiApiKey.includes('your_')) {
+      this.genAI = new GoogleGenerativeAI(this.geminiApiKey);
+      this.geminiModels = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+    }
+
+    // Groq Setup
+    if (this.groqApiKey && !this.groqApiKey.includes('your_')) {
+      this.groq = new Groq({ apiKey: this.groqApiKey });
+      this.groqModels = ['llama-3.3-70b-versatile', 'llama3-8b-8192'];
     }
   }
 
-  getSystemPrompt() {
-    return `You are an AI system designed for STRICT information extraction from software architecture-related documents.
+  getSystemPrompt(inputType = "text") {
+    return `You are an AI system responsible for extracting software architecture from MULTIPLE input formats.
 
-Your task is to extract ONLY explicitly stated or strongly evidenced architectural elements from the given input.
+## INPUT TYPE: ${inputType}
 
-## CRITICAL INSTRUCTIONS (VERY IMPORTANT):
+## TASK — Perform a COMPLETE analysis in 4 steps:
 
-1. DO NOT assume or invent architecture.
+### STEP 1: NORMALIZATION
+Convert the given input into a clean textual understanding:
+* If PDF/text/OCR → use the extracted text directly
+* If image/UML → interpret labels and connections (if vision supported)
+* If JSON → parse structure directly
 
-2. DO NOT add common system components like:
-   * Web Application
-   * Backend API
-   * Payment Gateway
-   * Authentication Service
-     UNLESS they are clearly mentioned in the input.
+### STEP 2: STRICT EXTRACTION
+Extract ONLY explicitly present or strongly supported elements.
 
-3. ONLY extract:
-   * Elements directly stated
-   * Elements strongly implied with clear textual evidence
+### STEP 3: TYPE-SPECIFIC RULES
+* image/uml: Interpret labels as components, arrows as flows, cylinders as DBs.
+* pdf/text: Identify services and storage from descriptions.
+* code: Identify controllers, routes, and DB connections.
 
-4. If something is not clearly present:
-   → RETURN EMPTY ARRAY []
+### STEP 4: SELF-VALIDATION
+✔ components must NOT be empty if input has entities.
+✔ Every entity in data_flows must exist in components.
 
-5. This is NOT a guessing task. This is STRICT extraction.
-
-## EXTRACTION TASK:
-Extract the following:
-### Components
-ONLY include if explicitly mentioned: (e.g., "Rule Engine", "Backend Server", "Dashboard")
-### APIs / Interfaces
-ONLY include if clearly mentioned: (e.g., "REST API", "HTTP Interface")
-### Databases / Storage
-ONLY include if explicitly stated
-### User Roles
-Extract actors such as: Software Architect, Developer, User, External System
-### Data Flows
-ONLY include if clearly described as movement between components
-### Trust Boundaries
-ONLY include if explicitly mentioned or clearly defined (e.g., Client-Server separation)
-### Sensitive Data
-ONLY include if mentioned (e.g., credentials, PII, confidential data)
-### External Dependencies
-ONLY include if clearly stated (e.g., third-party APIs)
-
-## OUTPUT FORMAT (STRICT JSON ONLY — NO TEXT):
+## OUTPUT FORMAT (STRICT JSON ONLY):
 {
+  "input_type": "${inputType}",
+  "extraction_confidence": 0-100,
   "components": [],
   "apis": [],
   "databases": [],
@@ -65,94 +56,146 @@ ONLY include if clearly stated (e.g., third-party APIs)
   "data_flows": [],
   "trust_boundaries": [],
   "sensitive_data": [],
-  "external_dependencies": []
+  "external_dependencies": [],
+  "missing_parameters": [],
+  "corrections_made": [],
+  "notes": []
 }
 
-## VALIDATION RULES:
-* If unsure → DO NOT include
-* If ambiguous → SKIP
-* If generic → SKIP
-* Prefer missing data over incorrect data
-
-## FINAL GOAL:
-Produce HIGH-PRECISION structured output with ZERO hallucination. Accuracy > completeness.`;
+## FIELD DEFINITIONS:
+- extraction_confidence: 80-100=clear, 50-79=partial, <50=weak
+- missing_parameters: fields that could not be extracted
+- corrections_made: list of fixes applied`;
   }
 
-  async extractArchitecture(inputText) {
-    if (!this.model) {
-      console.warn("GEMINI_API_KEY is not set. Returning mock data.");
-      return this.getMockResponse();
-    }
-
-    try {
-      const prompt = `${this.getSystemPrompt()}\n\n## INPUT:\n${inputText}`;
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      let text = response.text();
-
-      // Clean up the text in case the LLM returned markdown code blocks
-      text = text.replace(/```json/gi, '').replace(/```/gi, '').trim();
-
-      const parsedJson = JSON.parse(text);
-      return parsedJson;
-    } catch (error) {
-      console.error('Error generating AI content. Using smart fallback:', error.message);
-      // Fallback to heuristic mock extraction if the API key fails
-      return this.getSmartFallbackResponse(inputText);
-    }
+  fileToGenerativePart(filePath, mimeType) {
+    return {
+      inlineData: {
+        data: Buffer.from(fs.readFileSync(filePath)).toString("base64"),
+        mimeType,
+      },
+    };
   }
 
-  getSmartFallbackResponse(inputText) {
-    const text = inputText.toLowerCase();
+  getMimeType(filePath) {
+    const ext = filePath.split('.').pop().toLowerCase();
+    const map = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", svg: "image/svg+xml"
+    };
+    return map[ext] || "image/png";
+  }
+
+  async extractArchitecture(inputText, inputType = "text", filePath = null) {
+    console.log(`[AIService] Starting extraction for ${inputType}. Input length: ${inputText ? inputText.length : 0}`);
+    
+    // 1. Try Gemini (Supports Vision)
+    if (this.genAI) {
+      for (const modelName of this.geminiModels) {
+        try {
+          console.log(`[AIService] Trying Gemini: ${modelName}...`);
+          const model = this.genAI.getGenerativeModel({ model: modelName });
+          const prompt = `${this.getSystemPrompt(inputType)}\n\n## INPUT:\n${inputText}`;
+          let result;
+
+          if (filePath && fs.existsSync(filePath) && (inputType === "image" || inputType === "uml")) {
+            console.log(`[AIService] Using vision for ${filePath}`);
+            const mimeType = this.getMimeType(filePath);
+            const imagePart = this.fileToGenerativePart(filePath, mimeType);
+            result = await model.generateContent([prompt, imagePart]);
+          } else {
+            result = await model.generateContent(prompt);
+          }
+
+          const response = await result.response;
+          const text = response.text().replace(/```json/gi, '').replace(/```/gi, '').trim();
+          let parsed = JSON.parse(text);
+          console.log(`[AIService] Gemini ${modelName} success!`);
+          parsed.notes = parsed.notes || [];
+          parsed.notes.push(`Extracted via Gemini (${modelName})`);
+          return this.validateAndCorrect(parsed, inputType);
+        } catch (err) {
+          console.warn(`[AIService] Gemini ${modelName} failed: ${err.message}`);
+        }
+      }
+    }
+
+    // 2. Try Groq (Fast Text-only Fallback)
+    if (this.groq) {
+      console.log(`[AIService] Gemini failed or unavailable. Trying Groq...`);
+      for (const modelName of this.groqModels) {
+        try {
+          console.log(`[AIService] Trying Groq: ${modelName}...`);
+          
+          // Groq models are text-only usually, so we use the OCR/Text input
+          const completion = await this.groq.chat.completions.create({
+            messages: [
+              { role: "system", content: this.getSystemPrompt(inputType) },
+              { role: "user", content: `## INPUT:\n${inputText}` }
+            ],
+            model: modelName,
+            response_format: { type: "json_object" }
+          });
+
+          let parsed = JSON.parse(completion.choices[0].message.content);
+          console.log(`[AIService] Groq ${modelName} success!`);
+          parsed.notes = parsed.notes || [];
+          parsed.notes.push(`Extracted via Groq (${modelName})`);
+          return this.validateAndCorrect(parsed, inputType);
+        } catch (err) {
+          console.warn(`[AIService] Groq ${modelName} failed: ${err.message}`);
+        }
+      }
+    }
+
+    // 3. Heuristic Fallback
+    console.warn('[AIService] All AI models failed or unavailable. Using heuristic fallback.');
+    return this.getSmartFallbackResponse(inputText, inputType, filePath);
+  }
+
+  validateAndCorrect(data, inputType) {
+    const required = ['components', 'apis', 'databases', 'user_roles', 'data_flows', 'trust_boundaries', 'sensitive_data', 'external_dependencies'];
+    required.forEach(f => { if (!Array.isArray(data[f])) data[f] = []; });
+    data.input_type = data.input_type || inputType;
+    data.missing_parameters = required.filter(f => data[f].length === 0);
+    return data;
+  }
+
+  getSmartFallbackResponse(inputText, inputType = "text", filePath = null) {
+    if ((inputType === "image" || inputType === "uml") && (!inputText || inputText.includes('minimal text'))) {
+      return {
+        input_type: inputType,
+        extraction_confidence: 30,
+        components: ["[Requires AI Vision]"],
+        notes: ["API quota exhausted. OCR failed to find text labels in diagram."],
+        _retryable: true,
+        missing_parameters: ['components']
+      };
+    }
+
+    const text = (inputText || "").toLowerCase();
     const result = {
-      components: [],
-      apis: [],
-      databases: [],
-      user_roles: [],
-      data_flows: [],
-      trust_boundaries: [],
-      sensitive_data: [],
-      external_dependencies: []
+      input_type: inputType,
+      extraction_confidence: 40,
+      components: [], apis: [], databases: [], user_roles: [], data_flows: [], trust_boundaries: [], sensitive_data: [], external_dependencies: [],
+      missing_parameters: [], corrections_made: ["Used heuristic pattern matching"], notes: ["AI unavailable, using local patterns."]
     };
 
-    if (text.includes('web application')) result.components.push('Web Application');
-    if (text.includes('backend api') || text.includes('backend server')) result.components.push('Backend Server');
-    if (text.includes('authentication service')) result.components.push('Authentication Service');
-    if (text.includes('rule engine')) result.components.push('Rule Engine');
-    if (text.includes('dashboard')) result.components.push('Dashboard');
-    
-    if (text.includes('rest api')) result.apis.push('REST API');
-    if (text.includes('http interface')) result.apis.push('HTTP Interface');
-    
-    if (text.includes('mysql')) result.databases.push('MySQL Database');
-    if (text.includes('mongodb')) result.databases.push('MongoDB');
-    if (text.includes('redis')) result.databases.push('Redis Cache');
-    
-    if (text.includes('payment gateway')) result.external_dependencies.push('Payment Gateway');
-    if (text.includes('third-party api')) result.external_dependencies.push('Third-Party API');
-    
-    if (text.includes('user')) result.user_roles.push('User');
-    if (text.includes('admin')) result.user_roles.push('Admin');
-    if (text.includes('software architect')) result.user_roles.push('Software Architect');
-    if (text.includes('developer')) result.user_roles.push('Developer');
+    const patterns = {
+      components: [/web\s*app/g, /frontend/g, /backend/g, /server/g, /microservice/g, /auth\s*service/g, /dashboard/g, /gateway/g],
+      databases: [/mysql/g, /postgres/g, /mongodb/g, /redis/g, /database/g, /s3/g],
+      apis: [/rest\s*api/g, /graphql/g, /grpc/g, /http/g],
+      user_roles: [/admin/g, /user/g, /developer/g, /manager/g]
+    };
 
-    if (text.includes('data flow:') || text.includes('user → web application')) {
-      result.data_flows.push("User → Web Application → Backend API → Database");
-    }
-    
-    if (text.includes('sensitive data:') || text.includes('user credentials')) {
-      result.sensitive_data.push("User credentials");
-    }
-    if (text.includes('payment information')) {
-      result.sensitive_data.push("Payment information");
-    }
-    
-    if (text.includes('trust boundaries:') || text.includes('internet → web application')) {
-      result.trust_boundaries.push("Internet → Web Application");
-    }
-    if (text.includes('client-server separation')) {
-      result.trust_boundaries.push("Client-Server separation");
-    }
+    Object.keys(patterns).forEach(key => {
+      patterns[key].forEach(regex => {
+        const match = text.match(regex);
+        if (match) {
+          const label = regex.source.replace(/\\s\*/g, ' ').replace(/\//g, '').toUpperCase();
+          if (!result[key].includes(label)) result[key].push(label);
+        }
+      });
+    });
 
     return result;
   }
