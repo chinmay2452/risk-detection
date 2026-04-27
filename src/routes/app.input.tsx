@@ -36,7 +36,7 @@ function SmartInput() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <RepoCard />
+        {/* RepoCard removed as per requirements */}
         <DropZoneCard
           icon={ImageIcon}
           title="Architecture image"
@@ -121,12 +121,43 @@ function DropZoneCard({
 }) {
   const [drag, setDrag] = useState(false);
   const [file, setFile] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
+
+  async function handleFileUpload(selectedFile: File) {
+    if (!selectedFile) return;
+    setFile(selectedFile.name);
+    setUploading(true);
+    setStatusMsg("Uploading...");
+
+    const formData = new FormData();
+    formData.append("files", selectedFile);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setStatusMsg("Upload success!");
+      } else {
+        setStatusMsg(data.message || "Upload failed");
+      }
+    } catch (error) {
+      console.error(error);
+      setStatusMsg("Connection error");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function onDrop(e: DragEvent<HTMLLabelElement>) {
     e.preventDefault();
     setDrag(false);
     const f = e.dataTransfer.files?.[0];
-    if (f) setFile(f.name);
+    if (f) handleFileUpload(f);
   }
 
   return (
@@ -152,11 +183,15 @@ function DropZoneCard({
           drag
             ? "border-primary bg-primary/10"
             : "border-border/60 bg-background/30 hover:border-primary/50 hover:bg-primary/5",
+          uploading ? "opacity-50 cursor-not-allowed" : ""
         )}
       >
         <Upload className="size-5 text-muted-foreground" />
         {file ? (
-          <p className="mt-2 truncate px-3 text-xs font-mono text-primary">{file}</p>
+          <div className="mt-2 text-center">
+            <p className="truncate px-3 text-xs font-mono text-primary">{file}</p>
+            {statusMsg && <p className="mt-1 text-[10px] text-muted-foreground">{statusMsg}</p>}
+          </div>
         ) : (
           <>
             <p className="mt-2 text-xs">
@@ -169,7 +204,10 @@ function DropZoneCard({
           type="file"
           accept={accept}
           className="hidden"
-          onChange={(e) => setFile(e.target.files?.[0]?.name ?? null)}
+          disabled={uploading}
+          onChange={(e) => {
+            if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+          }}
         />
       </label>
     </GlassCard>
