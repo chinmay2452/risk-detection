@@ -9,38 +9,146 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppValidationRouteImport } from './routes/app.validation'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
+import { Route as AppMitigationRouteImport } from './routes/app.mitigation'
+import { Route as AppInputRouteImport } from './routes/app.input'
+import { Route as AppExtractionRouteImport } from './routes/app.extraction'
+import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
+import { Route as AppAnalyzeRouteImport } from './routes/app.analyze'
 
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppValidationRoute = AppValidationRouteImport.update({
+  id: '/validation',
+  path: '/validation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMitigationRoute = AppMitigationRouteImport.update({
+  id: '/mitigation',
+  path: '/mitigation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInputRoute = AppInputRouteImport.update({
+  id: '/input',
+  path: '/input',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppExtractionRoute = AppExtractionRouteImport.update({
+  id: '/extraction',
+  path: '/extraction',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAnalyzeRoute = AppAnalyzeRouteImport.update({
+  id: '/analyze',
+  path: '/analyze',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/app/analyze': typeof AppAnalyzeRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/extraction': typeof AppExtractionRoute
+  '/app/input': typeof AppInputRoute
+  '/app/mitigation': typeof AppMitigationRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/validation': typeof AppValidationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/app/analyze': typeof AppAnalyzeRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/extraction': typeof AppExtractionRoute
+  '/app/input': typeof AppInputRoute
+  '/app/mitigation': typeof AppMitigationRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/validation': typeof AppValidationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/app/analyze': typeof AppAnalyzeRoute
+  '/app/dashboard': typeof AppDashboardRoute
+  '/app/extraction': typeof AppExtractionRoute
+  '/app/input': typeof AppInputRoute
+  '/app/mitigation': typeof AppMitigationRoute
+  '/app/reports': typeof AppReportsRoute
+  '/app/validation': typeof AppValidationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/app/analyze'
+    | '/app/dashboard'
+    | '/app/extraction'
+    | '/app/input'
+    | '/app/mitigation'
+    | '/app/reports'
+    | '/app/validation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/app'
+    | '/app/analyze'
+    | '/app/dashboard'
+    | '/app/extraction'
+    | '/app/input'
+    | '/app/mitigation'
+    | '/app/reports'
+    | '/app/validation'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/app/analyze'
+    | '/app/dashboard'
+    | '/app/extraction'
+    | '/app/input'
+    | '/app/mitigation'
+    | '/app/reports'
+    | '/app/validation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +156,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/validation': {
+      id: '/app/validation'
+      path: '/validation'
+      fullPath: '/app/validation'
+      preLoaderRoute: typeof AppValidationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/mitigation': {
+      id: '/app/mitigation'
+      path: '/mitigation'
+      fullPath: '/app/mitigation'
+      preLoaderRoute: typeof AppMitigationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/input': {
+      id: '/app/input'
+      path: '/input'
+      fullPath: '/app/input'
+      preLoaderRoute: typeof AppInputRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/extraction': {
+      id: '/app/extraction'
+      path: '/extraction'
+      fullPath: '/app/extraction'
+      preLoaderRoute: typeof AppExtractionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/dashboard': {
+      id: '/app/dashboard'
+      path: '/dashboard'
+      fullPath: '/app/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/analyze': {
+      id: '/app/analyze'
+      path: '/analyze'
+      fullPath: '/app/analyze'
+      preLoaderRoute: typeof AppAnalyzeRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAnalyzeRoute: typeof AppAnalyzeRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppExtractionRoute: typeof AppExtractionRoute
+  AppInputRoute: typeof AppInputRoute
+  AppMitigationRoute: typeof AppMitigationRoute
+  AppReportsRoute: typeof AppReportsRoute
+  AppValidationRoute: typeof AppValidationRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAnalyzeRoute: AppAnalyzeRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppExtractionRoute: AppExtractionRoute,
+  AppInputRoute: AppInputRoute,
+  AppMitigationRoute: AppMitigationRoute,
+  AppReportsRoute: AppReportsRoute,
+  AppValidationRoute: AppValidationRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
