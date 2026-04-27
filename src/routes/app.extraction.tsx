@@ -35,10 +35,29 @@ const phases = [
 function Extraction() {
   const [phase, setPhase] = useState(0);
   const [done, setDone] = useState(false);
+  const [aiData, setAiData] = useState<any>(null);
 
   useEffect(() => {
+    async function performExtraction() {
+      try {
+        const extractedText = sessionStorage.getItem("extractedText");
+        if (extractedText) {
+          const res = await fetch("http://localhost:5000/api/extract", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ extractedText })
+          });
+          const json = await res.json();
+          if (json.success) setAiData(json.data);
+        }
+      } catch (err) {
+        console.error("Extraction error:", err);
+      }
+      setDone(true);
+    }
+
     if (phase >= phases.length - 1) {
-      const t = setTimeout(() => setDone(true), 700);
+      const t = setTimeout(() => performExtraction(), 700);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setPhase((p) => p + 1), 650);
@@ -46,7 +65,14 @@ function Extraction() {
   }, [phase]);
 
   if (!done) return <ExtractionLoading phase={phase} />;
-  return <ExtractionResults />;
+  
+  // If no data or failed, you can handle it or show mock data
+  const dataToUse = aiData || {
+    components: ["Failed to load AI data"],
+    apis: [], databases: [], user_roles: [], data_flows: [], trust_boundaries: []
+  };
+
+  return <ExtractionResults data={dataToUse} />;
 }
 
 function ExtractionLoading({ phase }: { phase: number }) {
@@ -90,14 +116,14 @@ function ExtractionLoading({ phase }: { phase: number }) {
   );
 }
 
-function ExtractionResults() {
+function ExtractionResults({ data }: { data: any }) {
   const sections = [
-    { title: "Components", icon: Boxes, items: extractedEntities.components.map((c) => `${c.name} · ${c.tech}`) },
-    { title: "APIs", icon: Globe, items: extractedEntities.apis.map((a) => `${a.method} ${a.path} · ${a.auth}`) },
-    { title: "Databases", icon: Database, items: extractedEntities.databases.map((d) => `${d.name} · ${d.engine}`) },
-    { title: "Roles", icon: Users, items: extractedEntities.roles.map((r) => `${r.name} · ${r.scope}`) },
-    { title: "Data flows", icon: GitBranch, items: extractedEntities.dataFlows.map((f) => `${f.from} → ${f.to} (${f.data})`) },
-    { title: "Trust boundaries", icon: ShieldCheck, items: extractedEntities.trustBoundaries.map((t) => `${t.name} · ${t.level}`) },
+    { title: "Components", icon: Boxes, items: data.components || [] },
+    { title: "APIs", icon: Globe, items: data.apis || [] },
+    { title: "Databases", icon: Database, items: data.databases || [] },
+    { title: "Roles", icon: Users, items: data.user_roles || [] },
+    { title: "Data flows", icon: GitBranch, items: data.data_flows || [] },
+    { title: "Trust boundaries", icon: ShieldCheck, items: data.trust_boundaries || [] },
   ];
 
   return (
@@ -117,14 +143,6 @@ function ExtractionResults() {
           Validate model <ArrowRight className="size-4" />
         </Link>
       </div>
-
-      {/* Node graph visual */}
-      <GlassCard className="p-6">
-        <h3 className="text-sm font-semibold">System graph</h3>
-        <div className="mt-4 overflow-x-auto">
-          <NodeGraph />
-        </div>
-      </GlassCard>
 
       {/* Cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -157,60 +175,4 @@ function ExtractionResults() {
   );
 }
 
-function NodeGraph() {
-  const nodes = [
-    { id: "client", label: "Web Client", x: 80, y: 140, color: "var(--color-chart-1)" },
-    { id: "gateway", label: "API Gateway", x: 280, y: 140, color: "var(--color-chart-1)" },
-    { id: "auth", label: "Auth Service", x: 480, y: 60, color: "var(--color-chart-2)" },
-    { id: "pay", label: "Payment Worker", x: 480, y: 220, color: "var(--color-chart-2)" },
-    { id: "db1", label: "users_db", x: 680, y: 60, color: "var(--color-chart-3)" },
-    { id: "db2", label: "payments_db", x: 680, y: 220, color: "var(--color-chart-3)" },
-  ];
-  const edges = [
-    ["client", "gateway"],
-    ["gateway", "auth"],
-    ["gateway", "pay"],
-    ["auth", "db1"],
-    ["pay", "db2"],
-  ];
 
-  const get = (id: string) => nodes.find((n) => n.id === id)!;
-
-  return (
-    <svg viewBox="0 0 800 300" className="w-full min-w-[700px]">
-      <defs>
-        <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity="0.6" />
-        </linearGradient>
-      </defs>
-      {edges.map(([a, b]) => {
-        const A = get(a), B = get(b);
-        return (
-          <g key={`${a}-${b}`}>
-            <line x1={A.x} y1={A.y} x2={B.x} y2={B.y} stroke="url(#edge)" strokeWidth="2" />
-            <circle r="3" fill="var(--color-chart-1)">
-              <animateMotion dur="3s" repeatCount="indefinite" path={`M${A.x},${A.y} L${B.x},${B.y}`} />
-            </circle>
-          </g>
-        );
-      })}
-      {nodes.map((n) => (
-        <g key={n.id}>
-          <circle cx={n.x} cy={n.y} r="34" fill="oklch(0.21 0.035 265)" stroke={n.color} strokeWidth="2" />
-          <circle cx={n.x} cy={n.y} r="34" fill={n.color} fillOpacity="0.1" />
-          <text
-            x={n.x}
-            y={n.y + 4}
-            textAnchor="middle"
-            fontSize="11"
-            fontFamily="monospace"
-            fill="oklch(0.95 0.01 240)"
-          >
-            {n.label.length > 11 ? n.label.slice(0, 10) + "…" : n.label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
