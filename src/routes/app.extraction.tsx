@@ -48,7 +48,12 @@ function Extraction() {
             body: JSON.stringify({ extractedText })
           });
           const json = await res.json();
-          if (json.success) setAiData(json.data);
+          if (json.success) {
+            setAiData(json.data);
+            // Persist architecture + validation result for the next step
+            sessionStorage.setItem("architectureData", JSON.stringify(json.data));
+            sessionStorage.setItem("validationResult", JSON.stringify(json.validation));
+          }
         }
       } catch (err) {
         console.error("Extraction error:", err);
