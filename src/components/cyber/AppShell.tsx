@@ -1,10 +1,11 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   Bell,
   FileText,
   GitBranch,
   LayoutDashboard,
+  LogOut,
   Menu,
   Search,
   Shield,
@@ -14,9 +15,11 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CyberBackground } from "./CyberBackground";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
   { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,10 +31,43 @@ const navItems = [
   { to: "/app/reports", label: "Reports", icon: FileText },
 ] as const;
 
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join("");
+}
+
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { location } = useRouterState();
   const path = location.pathname;
+
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setProfile(data);
+      });
+  }, [user]);
+
+  const displayName = profile?.full_name || user?.email?.split("@")[0] || "User";
+  const initials = getInitials(displayName);
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate({ to: "/auth" });
+  };
 
   return (
     <div className="relative min-h-screen">
@@ -99,14 +135,22 @@ export function AppShell() {
               </button>
               <div className="flex items-center gap-2.5">
                 <div className="hidden md:block text-right">
-                  <p className="text-xs font-medium leading-tight">Aria Patel</p>
-                  <p className="text-[10px] text-muted-foreground">Security Lead</p>
+                  <p className="text-xs font-medium leading-tight">{displayName}</p>
+                  <p className="text-[10px] text-muted-foreground">{user?.email}</p>
                 </div>
                 <div className="size-9 rounded-full bg-gradient-to-br from-primary to-secondary p-px">
                   <div className="flex size-full items-center justify-center rounded-full bg-card text-xs font-semibold">
-                    AP
+                    {initials}
                   </div>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  title="Sign out"
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </button>
               </div>
             </div>
           </header>
@@ -195,3 +239,4 @@ function SidebarContent({
     </div>
   );
 }
+
