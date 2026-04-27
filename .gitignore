@@ -30,5 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env.local
+
+# Environment Variables
 .env
+.env.local
+backend/.env
+

@@ -5,6 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const uploadRoutes = require('./routes/upload.routes');
 const extractRoutes = require('./routes/extract.routes');
+const validateRoutes = require('./routes/validate.routes');
+const analyzeRoutes = require('./routes/analyze.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,6 +24,8 @@ app.use(express.json());
 // Routes
 app.use('/api', uploadRoutes);
 app.use('/api', extractRoutes);
+app.use('/api', validateRoutes);
+app.use('/api', analyzeRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

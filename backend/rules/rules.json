@@ -1,0 +1,146 @@
+[
+  {
+    "id": "R01",
+    "name": "Sensitive Data Exposure",
+    "severity": "High",
+    "description": "Sensitive data is present but no trust boundaries are defined to isolate or protect it.",
+    "cause": "Sensitive data items exist in the model but no trust boundaries are declared to restrict access.",
+    "recommendation": [
+      "Define explicit trust boundaries between internal and external zones.",
+      "Encrypt sensitive data both in transit and at rest."
+    ]
+  },
+  {
+    "id": "R02",
+    "name": "Direct Database Access Without Intermediate Layer",
+    "severity": "High",
+    "description": "Data flows indicate direct access to databases without a service or API layer acting as an intermediary.",
+    "cause": "One or more data flows connect directly to a database without passing through an API or service.",
+    "recommendation": [
+      "Introduce a dedicated service or repository layer between callers and the database."
+    ]
+  },
+  {
+    "id": "R03",
+    "name": "Missing API Layer",
+    "severity": "Medium",
+    "description": "Data flows exist but no APIs are defined, meaning components interact without defined contracts.",
+    "cause": "Data flows are defined but the API layer is missing from the architecture.",
+    "recommendation": [
+      "Define explicit API contracts for all inter-component communication."
+    ]
+  },
+  {
+    "id": "R04",
+    "name": "User Roles Without Access Control Boundaries",
+    "severity": "High",
+    "description": "User roles are defined but no trust boundaries or access control layers exist to enforce authorisation.",
+    "cause": "User roles are declared in the model but no trust boundaries are referenced.",
+    "recommendation": [
+      "Implement Role-Based Access Control (RBAC) and assign permissions explicitly per role.",
+      "Define trust boundaries that segment what each role can reach."
+    ]
+  },
+  {
+    "id": "R05",
+    "name": "Unused Database",
+    "severity": "Low",
+    "description": "Databases exist but no data flows reference them, indicating an unused or isolated storage system.",
+    "cause": "The architecture defines databases that are not part of any data flow.",
+    "recommendation": [
+      "Ensure all required databases are connected to services.",
+      "Remove unused database components to reduce attack surface."
+    ]
+  },
+  {
+    "id": "R07",
+    "name": "External Dependencies Without Trust Boundaries",
+    "severity": "High",
+    "description": "External dependencies are present but no trust boundaries are defined, leaving third-party interactions ungoverned.",
+    "cause": "External dependencies are listed but no trust boundary separates them from internal components.",
+    "recommendation": [
+      "Define explicit trust boundaries between internal systems and third-party services."
+    ]
+  },
+  {
+    "id": "R09",
+    "name": "Sensitive Data Transmitted Without Encryption Reference",
+    "severity": "High",
+    "description": "Sensitive data appears in data flows but there is no mention of encryption or secure transport.",
+    "cause": "Sensitive data items are present in data flows but no encryption reference is found in the model.",
+    "recommendation": [
+      "Enforce TLS on all communication channels carrying sensitive data."
+    ]
+  },
+  {
+    "id": "R10",
+    "name": "APIs Present Without Authentication Reference",
+    "severity": "High",
+    "description": "APIs are defined but no authentication mechanism is referenced in the model.",
+    "cause": "APIs are declared in the model but no authentication method is referenced in components, APIs, or trust boundaries.",
+    "recommendation": [
+      "Implement authentication on all APIs."
+    ]
+  },
+  {
+    "id": "R11",
+    "name": "Insecure Communication",
+    "severity": "High",
+    "description": "Data flows are present but no trust boundaries exist, meaning data movement across zones is unprotected.",
+    "cause": "Data flows traverse components but no trust boundaries are defined to separate security zones.",
+    "recommendation": [
+      "Define trust boundaries aligned with security zones.",
+      "Enforce TLS on all cross-boundary data flows."
+    ]
+  },
+  {
+    "id": "R12",
+    "name": "SQL Injection Risk",
+    "severity": "Critical",
+    "description": "APIs interact with databases with no validation or ORM layer implied, creating SQL injection exposure.",
+    "cause": "APIs and databases both exist in the model but no input validation or ORM is referenced between them.",
+    "recommendation": [
+      "Use parameterised queries or a trusted ORM for all database interactions."
+    ]
+  },
+  {
+    "id": "R14",
+    "name": "External Dependencies With No Validation Layer",
+    "severity": "High",
+    "description": "External dependencies exist but no validation or API gateway layer is present to mediate access.",
+    "cause": "External dependencies are listed but the model contains no API gateway or proxy.",
+    "recommendation": [
+      "Route all external calls through an API gateway or reverse proxy."
+    ]
+  },
+  {
+    "id": "R18",
+    "name": "Insecure Direct Object Reference Risk",
+    "severity": "High",
+    "description": "User roles interact with databases directly in data flows without an access control layer.",
+    "cause": "Data flows reference both user roles and databases directly without any authorisation check.",
+    "recommendation": [
+      "Implement server-side authorisation checks before any database query."
+    ]
+  },
+  {
+    "id": "R19",
+    "name": "Privilege Escalation Risk",
+    "severity": "High",
+    "description": "Multiple user roles exist but no trust boundaries segment or restrict what each role can access.",
+    "cause": "Multiple user roles are defined but no trust boundaries separate their access zones.",
+    "recommendation": [
+      "Define trust boundaries that explicitly limit each role to its permitted access zone."
+    ]
+  },
+  {
+    "id": "R20",
+    "name": "Unprotected Admin or Privileged Role Detected",
+    "severity": "Critical",
+    "description": "An admin or privileged role is defined in the model without any associated trust boundary or access restriction.",
+    "cause": "An admin or privileged role exists in the model but no trust boundaries protect it.",
+    "recommendation": [
+      "Restrict admin access to a dedicated, IP-allowlisted management plane."
+    ]
+  }
+]

@@ -1,7 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Info,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
+import { useMemo } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
-import { validationChecks } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/validation")({
@@ -14,10 +22,72 @@ export const Route = createFileRoute("/app/validation")({
   component: Validation,
 });
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ValidationIssue {
+  type: "Missing" | "Inconsistent" | "Logical";
+  description: string;
+}
+
+interface ValidationResult {
+  is_valid: boolean;
+  issues: ValidationIssue[];
+  suggestions: string[];
+  confidence_score: number;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function readValidationResult(): ValidationResult {
+  try {
+    const raw = sessionStorage.getItem("validationResult");
+    if (raw) return JSON.parse(raw) as ValidationResult;
+  } catch {
+    /* fall through to default */
+  }
+  // Graceful default when nothing is in sessionStorage yet
+  return {
+    is_valid: false,
+    issues: [
+      {
+        type: "Missing",
+        description: "No validation data found. Please complete the extraction step first.",
+      },
+    ],
+    suggestions: ["Go back and upload a file to start the extraction process."],
+    confidence_score: 0,
+  };
+}
+
+function issueIcon(type: ValidationIssue["type"]) {
+  if (type === "Missing") return XCircle;
+  if (type === "Inconsistent") return AlertTriangle;
+  return Info;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 function Validation() {
-  const score = 92;
-  const passes = validationChecks.filter((c) => c.status === "pass").length;
-  const warns = validationChecks.filter((c) => c.status === "warn").length;
+  const result = useMemo(() => readValidationResult(), []);
+
+  const { is_valid, issues, suggestions, confidence_score } = result;
+
+  // Build a unified checklist:
+  // • One item per issue (warn / fail)
+  // • If no issues at all → single "pass" item
+  const checklist = useMemo(() => {
+    if (issues.length === 0) {
+      return [{ label: "All checks passed", status: "pass" as const, type: undefined }];
+    }
+    return issues.map((iss) => ({
+      label: iss.description,
+      status: "warn" as const,
+      type: iss.type,
+    }));
+  }, [issues]);
+
+  const passes = checklist.filter((c) => c.status === "pass").length;
+  const warns = checklist.filter((c) => c.status === "warn").length;
 
   return (
     <div className="space-y-6">
@@ -30,14 +100,19 @@ function Validation() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Score */}
+        {/* Score ring */}
         <GlassCard className="flex flex-col items-center justify-center p-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Architecture readiness
           </p>
-          <ScoreRing score={score} />
+          <ScoreRing score={confidence_score} isValid={is_valid} />
           <p className="mt-2 text-sm">
-            <span className="font-semibold text-success">Ready</span> for analysis
+            {is_valid ? (
+              <span className="font-semibold text-success">Ready</span>
+            ) : (
+              <span className="font-semibold text-warning">Needs review</span>
+            )}{" "}
+            for analysis
           </p>
         </GlassCard>
 
@@ -54,49 +129,76 @@ function Validation() {
               </span>
             </div>
           </div>
+
           <ul className="mt-4 space-y-2">
-            {validationChecks.map((c) => (
-              <li
-                key={c.label}
-                className={cn(
-                  "flex items-center justify-between rounded-xl border px-4 py-3 text-sm transition-colors",
-                  c.status === "pass"
-                    ? "border-success/30 bg-success/5"
-                    : "border-warning/30 bg-warning/5",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={cn(
-                      "flex size-7 items-center justify-center rounded-full",
-                      c.status === "pass"
-                        ? "bg-success/20 text-success"
-                        : "bg-warning/20 text-warning",
-                    )}
-                  >
-                    {c.status === "pass" ? (
-                      <Check className="size-4" />
-                    ) : (
-                      <AlertTriangle className="size-4" />
-                    )}
-                  </span>
-                  <span>{c.label}</span>
-                </div>
-                <span
+            {checklist.map((c, idx) => {
+              const Icon = c.type ? issueIcon(c.type) : Check;
+              return (
+                <li
+                  key={idx}
                   className={cn(
-                    "text-xs font-semibold uppercase tracking-wider",
-                    c.status === "pass" ? "text-success" : "text-warning",
+                    "flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm transition-colors",
+                    c.status === "pass"
+                      ? "border-success/30 bg-success/5"
+                      : "border-warning/30 bg-warning/5"
                   )}
                 >
-                  {c.status === "pass" ? "Pass" : "Warn"}
-                </span>
-              </li>
-            ))}
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+                        c.status === "pass"
+                          ? "bg-success/20 text-success"
+                          : "bg-warning/20 text-warning"
+                      )}
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="leading-snug">{c.label}</span>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={cn(
+                        "text-xs font-semibold uppercase tracking-wider",
+                        c.status === "pass" ? "text-success" : "text-warning"
+                      )}
+                    >
+                      {c.status === "pass" ? "Pass" : "Warn"}
+                    </span>
+                    {c.type && (
+                      <span className="rounded bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        {c.type}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
+
+          {/* Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">
+                Suggestions
+              </p>
+              <ul className="space-y-1.5">
+                {suggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <span className="mt-1 size-1.5 shrink-0 rounded-full bg-primary" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </GlassCard>
       </div>
 
-      <GlassCard hover={false} className="flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <GlassCard
+        hover={false}
+        className="flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div className="flex items-center gap-3">
           <ShieldAlert className="size-5 text-warning" />
           <p className="text-sm text-muted-foreground">
@@ -122,7 +224,9 @@ function Validation() {
   );
 }
 
-function ScoreRing({ score }: { score: number }) {
+// ── Score Ring ────────────────────────────────────────────────────────────────
+
+function ScoreRing({ score, isValid }: { score: number; isValid: boolean }) {
   const r = 70;
   const c = 2 * Math.PI * r;
   const dash = (score / 100) * c;
@@ -136,16 +240,24 @@ function ScoreRing({ score }: { score: number }) {
           cy="90"
           r={r}
           fill="none"
-          stroke="url(#ringGrad)"
+          stroke={isValid ? "url(#ringGrad)" : "url(#ringWarn)"}
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={`${dash} ${c}`}
-          style={{ filter: "drop-shadow(0 0 10px oklch(0.78 0.16 215 / 0.6))" }}
+          style={{
+            filter: isValid
+              ? "drop-shadow(0 0 10px oklch(0.78 0.16 215 / 0.6))"
+              : "drop-shadow(0 0 10px oklch(0.78 0.18 75 / 0.6))",
+          }}
         />
         <defs>
           <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="var(--color-chart-1)" />
             <stop offset="100%" stopColor="var(--color-chart-2)" />
+          </linearGradient>
+          <linearGradient id="ringWarn" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="oklch(0.78 0.18 75)" />
+            <stop offset="100%" stopColor="oklch(0.65 0.15 55)" />
           </linearGradient>
         </defs>
       </svg>
