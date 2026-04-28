@@ -11,6 +11,7 @@ class AIService {
     if (this.geminiApiKey && !this.geminiApiKey.includes('your_')) {
       this.genAI = new GoogleGenerativeAI(this.geminiApiKey);
       this.geminiModels = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
+      this.model = this.genAI.getGenerativeModel({ model: this.geminiModels[0] });
     }
 
     // Groq Setup
@@ -251,6 +252,7 @@ Determine if the model has enough detail for:
 * DO NOT hallucinate missing architecture
 * Only report issues based on given data
 * If everything is fine, return empty issues array []
+* ALWAYS provide at least one helpful suggestion in the "suggestions" array, even if the architecture is perfectly valid.
 * Be precise and concise
 `;
   }
@@ -373,6 +375,11 @@ For each risk, verify:
       text = text.replace(/```json/gi, '').replace(/```/gi, '').trim();
 
       const parsedJson = JSON.parse(text);
+      
+      if (!parsedJson.suggestions || !Array.isArray(parsedJson.suggestions) || parsedJson.suggestions.length === 0) {
+        parsedJson.suggestions = ["Review the extracted architecture manually before proceeding to security analysis."];
+      }
+      
       return parsedJson;
     } catch (error) {
       console.error('Error generating AI content for validation. Using smart fallback:', error.message);

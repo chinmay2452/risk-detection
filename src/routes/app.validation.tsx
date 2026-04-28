@@ -8,7 +8,7 @@ import {
   ShieldAlert,
   XCircle,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
 import { cn } from "@/lib/utils";
 
@@ -38,53 +38,89 @@ interface ValidationResult {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function readValidationResult(): ValidationResult {
-  try {
-    const raw = sessionStorage.getItem("validationResult");
-    if (raw) return JSON.parse(raw) as ValidationResult;
-  } catch {
-    /* fall through to default */
-  }
-  // Graceful default when nothing is in sessionStorage yet
-  return {
-    is_valid: false,
-    issues: [
-      {
-        type: "Missing",
-        description: "No validation data found. Please complete the extraction step first.",
-      },
-    ],
-    suggestions: ["Go back and upload a file to start the extraction process."],
-    confidence_score: 0,
-  };
-}
-
 function issueIcon(type: ValidationIssue["type"]) {
   if (type === "Missing") return XCircle;
   if (type === "Inconsistent") return AlertTriangle;
   return Info;
 }
 
+const phases = [
+  "Checking for missing components...",
+  "Validating data flow logic...",
+  "Analyzing consistency...",
+  "Scoring model readiness...",
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function Validation() {
-  const result = useMemo(() => readValidationResult(), []);
+  const [phase, setPhase] = useState(0);
+  const [done, setDone] = useState(false);
+  const [result, setResult] = useState<ValidationResult | null>(null);
+
+  useEffect(() => {
+    async function performValidation() {
+      try {
+        const archStr = sessionStorage.getItem("architectureData");
+        if (!archStr) {
+          setResult({
+            is_valid: false,
+            issues: [{ type: "Missing", description: "No architecture data found. Please complete the extraction step first." }],
+            suggestions: ["Go back and upload a file to start the extraction process."],
+            confidence_score: 0,
+          });
+          setDone(true);
+          return;
+        }
+
+        const res = await fetch("http://localhost:5000/api/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: archStr,
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          setResult(json.data);
+          sessionStorage.setItem("validationResult", JSON.stringify(json.data));
+        } else {
+          setResult({
+            is_valid: false,
+            issues: [{ type: "Missing", description: json.message || "Validation failed." }],
+            suggestions: ["Try re-extracting the architecture."],
+            confidence_score: 0,
+          });
+        }
+      } catch (err) {
+        setResult({
+          is_valid: false,
+          issues: [{ type: "Missing", description: "Failed to connect to the validation server." }],
+          suggestions: ["Check if the backend is running."],
+          confidence_score: 0,
+        });
+      }
+      setDone(true);
+    }
+
+    if (phase >= phases.length - 1) {
+      const t = setTimeout(() => performValidation(), 700);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setPhase((p) => p + 1), 650);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  if (!done || !result) return <ValidationLoading phase={phase} />;
 
   const { is_valid, issues, suggestions, confidence_score } = result;
 
-  // Build a unified checklist:
-  // • One item per issue (warn / fail)
-  // • If no issues at all → single "pass" item
-  const checklist = useMemo(() => {
-    if (issues.length === 0) {
-      return [{ label: "All checks passed", status: "pass" as const, type: undefined }];
-    }
-    return issues.map((iss) => ({
-      label: iss.description,
-      status: "warn" as const,
-      type: iss.type,
-    }));
-  }, [issues]);
+  const checklist = issues.length === 0
+    ? [{ label: "All checks passed", status: "pass" as const, type: undefined }]
+    : issues.map((iss) => ({
+        label: iss.description,
+        status: "warn" as const,
+        type: iss.type,
+      }));
 
   const passes = checklist.filter((c) => c.status === "pass").length;
   const warns = checklist.filter((c) => c.status === "warn").length;
@@ -264,6 +300,47 @@ function ScoreRing({ score, isValid }: { score: number; isValid: boolean }) {
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-mono text-5xl font-bold text-gradient-cyan">{score}</span>
         <span className="text-xs text-muted-foreground">/ 100</span>
+      </div>
+    </div>
+  );
+}
+
+function ValidationLoading({ phase }: { phase: number }) {
+  return (
+    <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
+      <div className="relative mb-10 size-48">
+        <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+        <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin [animation-duration:2s]" />
+        <div className="absolute inset-3 rounded-full border-2 border-secondary/20" />
+        <div className="absolute inset-3 rounded-full border-b-2 border-secondary animate-spin [animation-duration:3s] [animation-direction:reverse]" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary glow-cyan animate-pulse-glow">
+            <ShieldAlert className="size-9 text-primary-foreground" />
+          </div>
+        </div>
+        <div className="absolute inset-0 animate-spin [animation-duration:6s]">
+          <div className="absolute -top-1 left-1/2 size-2 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_15px] shadow-primary" />
+        </div>
+      </div>
+
+      <h2 className="text-3xl font-bold tracking-tight">
+        AI is validating your <span className="text-gradient">architecture model</span>
+      </h2>
+      <p
+        className="mt-4 font-mono text-sm text-primary animate-pulse"
+        dangerouslySetInnerHTML={{ __html: phases[phase] }}
+      />
+
+      <div className="mt-10 w-full max-w-md">
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted/50">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow transition-all duration-500"
+            style={{ width: `${((phase + 1) / phases.length) * 100}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Phase {phase + 1} of {phases.length}
+        </p>
       </div>
     </div>
   );
