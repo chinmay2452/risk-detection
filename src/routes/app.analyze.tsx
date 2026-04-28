@@ -50,11 +50,13 @@ interface Risk {
   name: string;
   description: string;
   severity: Severity;
+  severity_score?: number;
   category: string;
   owasp: string;
   cwe: string;
   affected_components: string[];
   confidence: number;
+  recommendation?: string[];
 }
 
 interface Summary {
@@ -365,6 +367,7 @@ function Analyze() {
               <thead>
                 <tr className="border-b border-border/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="py-2.5 pr-3 font-medium">Risk</th>
+                  <th className="py-2.5 pr-3 font-medium text-center">AI Score</th>
                   <th className="py-2.5 pr-3 font-medium">Severity</th>
                   <th className="py-2.5 pr-3 font-medium">Affected Components</th>
                   <th className="py-2.5 pr-3 font-medium">Cause</th>
@@ -417,6 +420,16 @@ function RiskRow({ risk }: { risk: Risk }) {
           </div>
         </td>
 
+        {/* AI Score */}
+        <td className="py-3 pr-3 text-center">
+          <div className="flex flex-col items-center gap-1">
+            <span className="inline-flex items-center justify-center size-8 rounded-lg bg-primary/10 border border-primary/20 font-mono text-xs font-bold text-primary">
+              {risk.severity_score ?? "—"}
+            </span>
+            <span className="text-[9px] uppercase tracking-tighter text-muted-foreground">Score</span>
+          </div>
+        </td>
+
         {/* Severity */}
         <td className="py-3 pr-3 whitespace-nowrap">
           <SeverityPill severity={risk.severity.toLowerCase() as any} />
@@ -463,7 +476,7 @@ function RiskRow({ risk }: { risk: Risk }) {
       {/* Expandable recommendations row */}
       {expanded && hasRecs && (
         <tr className="border-b border-border/20 bg-primary/3">
-          <td colSpan={5} className="px-8 pb-4 pt-2">
+          <td colSpan={6} className="px-8 pb-4 pt-2">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-primary">
               Recommendations
             </p>

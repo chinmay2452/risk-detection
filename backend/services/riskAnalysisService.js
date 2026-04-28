@@ -40,6 +40,24 @@ async function analyseArchitecture(architectureModel) {
     source = 'rule-engine';
   }
 
+  // ── Step 3: Apply Severity Scoring (AI/ML-inspired) ───────────────────────
+  if (risks && risks.length > 0) {
+    const { refineRisks } = require('./severityScoringService');
+    risks = refineRisks(risks, architectureModel);
+    console.log('[RiskAnalysis] Severity scoring applied to refine risks.');
+  }
+
+  // ── Step 4: Apply Mitigation Engine ────────────────────────────────────────
+  if (risks && risks.length > 0) {
+    const { generateMitigations } = require('./mitigationEngineService');
+    // We optionally merge the mitigations back into the risk objects or use them as generated
+    // The user strictly requested specific fields, so we map them to ensure we meet the output format,
+    // but in a real pipeline we might retain 'description' and 'cause' for the UI.
+    // For now, we will use the mitigation engine to transform the risks.
+    risks = generateMitigations(risks);
+    console.log('[RiskAnalysis] Mitigation engine applied to generate recommendations.');
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────
   const summary = buildSummary(risks, source);
 
