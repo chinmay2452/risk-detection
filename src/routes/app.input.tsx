@@ -9,7 +9,7 @@ import {
   Network,
   Upload,
 } from "lucide-react";
-import { useState, type DragEvent } from "react";
+import { useState, useEffect, type DragEvent } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
 import { cn } from "@/lib/utils";
 
@@ -225,6 +225,25 @@ function DropZoneCard({
 }
 
 function CodeSnippetCard() {
+  const defaultCode = `// Paste your code here\nexport async function handler(req) {\n  const body = await req.json();\n  return Response.json(body);\n}`;
+  const [code, setCode] = useState(defaultCode);
+
+  useEffect(() => {
+    // Only set on mount if nothing else is there, or just let it be.
+    // Actually, setting it on mount might overwrite the file upload.
+    // Let's only set it if there's no extractedText
+    if (!sessionStorage.getItem("extractedText")) {
+      sessionStorage.setItem("extractedText", defaultCode);
+      sessionStorage.setItem("inputType", "code");
+    }
+  }, []);
+
+  const handleUpdate = (val: string) => {
+    setCode(val);
+    sessionStorage.setItem("extractedText", val);
+    sessionStorage.setItem("inputType", "code");
+  };
+
   return (
     <GlassCard className="p-5">
       <div className="flex items-center gap-3">
@@ -237,7 +256,9 @@ function CodeSnippetCard() {
         </div>
       </div>
       <textarea
-        defaultValue={`// Paste your code here\nexport async function handler(req) {\n  const body = await req.json();\n  return Response.json(body);\n}`}
+        value={code}
+        onChange={(e) => handleUpdate(e.target.value)}
+        onFocus={(e) => handleUpdate(e.target.value)}
         rows={6}
         className="mt-4 w-full rounded-lg border border-border bg-background/40 p-3 text-xs font-mono leading-relaxed placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
       />
@@ -246,6 +267,22 @@ function CodeSnippetCard() {
 }
 
 function JsonCard() {
+  const defaultJson = `{\n  "components": ["Frontend UI", "Auth Service"],\n  "apis": ["REST API"],\n  "databases": ["PostgreSQL"],\n  "trustBoundaries": ["VPC"]\n}`;
+  const [jsonStr, setJsonStr] = useState(defaultJson);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("extractedText")) {
+      sessionStorage.setItem("extractedText", defaultJson);
+      sessionStorage.setItem("inputType", "json");
+    }
+  }, []);
+
+  const handleUpdate = (val: string) => {
+    setJsonStr(val);
+    sessionStorage.setItem("extractedText", val);
+    sessionStorage.setItem("inputType", "json");
+  };
+
   return (
     <GlassCard className="p-5">
       <div className="flex items-center gap-3">
@@ -258,7 +295,9 @@ function JsonCard() {
         </div>
       </div>
       <textarea
-        defaultValue={`{\n  "components": [],\n  "apis": [],\n  "databases": [],\n  "trustBoundaries": []\n}`}
+        value={jsonStr}
+        onChange={(e) => handleUpdate(e.target.value)}
+        onFocus={(e) => handleUpdate(e.target.value)}
         rows={6}
         className="mt-4 w-full rounded-lg border border-border bg-background/40 p-3 text-xs font-mono leading-relaxed placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
       />

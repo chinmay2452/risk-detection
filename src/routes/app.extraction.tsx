@@ -57,7 +57,19 @@ function Extraction() {
             // Persist architecture + validation result for the next step
             sessionStorage.setItem("architectureData", JSON.stringify(json.data));
             sessionStorage.setItem("validationResult", JSON.stringify(json.validation));
+          } else {
+            setAiData({
+              error: true,
+              message: json.message || "Extraction failed.",
+              components: [], apis: [], databases: [], user_roles: [], data_flows: [], trust_boundaries: []
+            });
           }
+        } else {
+          setAiData({
+            error: true,
+            message: "No input data found. Please go back and provide an input.",
+            components: [], apis: [], databases: [], user_roles: [], data_flows: [], trust_boundaries: []
+          });
         }
       } catch (err) {
         console.error("Extraction error:", err);
@@ -270,15 +282,31 @@ function ExtractionResults({ data }: { data: any }) {
               </div>
             </div>
             <ul className="mt-4 space-y-2">
-              {s.items.map((item) => (
-                <li
-                  key={item}
-                  className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/30 px-3 py-2 text-xs font-mono"
-                >
-                  <span className="size-1.5 rounded-full bg-primary" />
-                  <span className="truncate">{item}</span>
-                </li>
-              ))}
+              {s.items.map((item: any, idx: number) => {
+                let displayText = item;
+                if (typeof item === 'object' && item !== null) {
+                  if (item.source && item.target) {
+                    displayText = `${item.source} → ${item.target}`;
+                    if (item.description) displayText += ` (${item.description})`;
+                  } else if (item.name) {
+                    displayText = item.name;
+                  } else {
+                    displayText = JSON.stringify(item);
+                  }
+                }
+                
+                return (
+                  <li
+                    key={idx}
+                    className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/30 px-3 py-2 text-xs font-mono"
+                  >
+                    <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                    <span className="truncate" title={typeof displayText === 'string' ? displayText : undefined}>
+                      {displayText}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </GlassCard>
         ))}
