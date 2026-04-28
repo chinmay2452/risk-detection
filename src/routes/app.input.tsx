@@ -144,6 +144,13 @@ function DropZoneCard({
         setStatusMsg("Upload success!");
         if (data.data && data.data[0] && data.data[0].extractedText) {
           sessionStorage.setItem("extractedText", data.data[0].extractedText);
+          sessionStorage.setItem("filePath", data.data[0].filePath);
+          let type = "text";
+          if (title.toLowerCase().includes("image")) type = "image";
+          if (title.toLowerCase().includes("uml")) type = "uml";
+          if (title.toLowerCase().includes("pdf")) type = "pdf";
+          if (title.toLowerCase().includes("json")) type = "json";
+          sessionStorage.setItem("inputType", type);
         }
       } else {
         setStatusMsg(data.message || "Upload failed");

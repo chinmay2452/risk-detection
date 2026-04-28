@@ -1,5 +1,6 @@
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
+const Tesseract = require('tesseract.js');
 
 class FileService {
   /**
@@ -18,14 +19,36 @@ class FileService {
         const dataBuffer = fs.readFileSync(file.path);
         const data = await pdfParse(dataBuffer);
         result.extractedText = data.text;
+
       } else if (file.mimetype === 'application/json') {
         const fileContent = fs.readFileSync(file.path, 'utf8');
         result.parsedJson = JSON.parse(fileContent);
-        // Stringify the JSON back to text for easy display
         result.extractedText = JSON.stringify(result.parsedJson, null, 2);
+
       } else if (file.mimetype.startsWith('image/')) {
-        // Future: Add OCR processing here
-        result.extractedText = '[Image uploaded. OCR extraction pending in future updates.]';
+        // Use Tesseract OCR to extract text from architecture diagrams
+        console.log(`[FileService] Running OCR on image: ${file.originalname}`);
+        try {
+          const { data: { text: ocrText } } = await Tesseract.recognize(file.path, 'eng', {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                console.log(`[FileService] OCR progress: ${Math.round(m.progress * 100)}%`);
+              }
+            }
+          });
+
+          const cleanedText = ocrText.trim();
+          if (cleanedText && cleanedText.length > 10) {
+            console.log(`[FileService] OCR extracted ${cleanedText.length} characters from image`);
+            result.extractedText = `[Architecture Diagram OCR Extract from: ${file.originalname}]\n\n${cleanedText}`;
+          } else {
+            console.log('[FileService] OCR found minimal text, providing image metadata');
+            result.extractedText = `[Architectural Image: ${file.originalname}]. OCR found minimal text labels. The image may be a non-text diagram.`;
+          }
+        } catch (ocrError) {
+          console.error('[FileService] OCR failed:', ocrError.message);
+          result.extractedText = `[Architectural Image: ${file.originalname}]. OCR extraction failed.`;
+        }
       }
     } catch (error) {
       console.error('Error processing file:', error);

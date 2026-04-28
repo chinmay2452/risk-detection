@@ -2,7 +2,7 @@ const aiService = require('../services/ai.service');
 
 const extractArchitecture = async (req, res, next) => {
   try {
-    const { extractedText } = req.body;
+    const { extractedText, inputType, filePath } = req.body;
 
     if (!extractedText) {
       return res.status(400).json({
@@ -11,17 +11,13 @@ const extractArchitecture = async (req, res, next) => {
       });
     }
 
-    // Step 1: Extract architecture from raw text
-    const architectureData = await aiService.extractArchitecture(extractedText);
-
-    // Step 2: Automatically validate the extracted architecture
-    const validationResult = await aiService.validateArchitecture(architectureData);
+    // Extraction now handles multi-model fallback and self-correction internally
+    const architectureData = await aiService.extractArchitecture(extractedText, inputType || 'text', filePath);
 
     res.status(200).json({
       success: true,
-      message: 'Architecture extracted and validated successfully',
-      data: architectureData,
-      validation: validationResult,
+      message: 'Architecture extracted successfully',
+      data: architectureData
     });
   } catch (error) {
     next(error);
