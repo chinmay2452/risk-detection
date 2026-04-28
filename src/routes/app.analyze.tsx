@@ -34,8 +34,7 @@ export const Route = createFileRoute("/app/analyze")({
       { title: "Analyze Results — SentinelAI" },
       {
         name: "description",
-        content:
-          "Detailed risk analysis with severity, components, and recommendations.",
+        content: "Detailed risk analysis with severity, components, and recommendations.",
       },
     ],
   }),
@@ -52,6 +51,7 @@ interface Risk {
   description: string;
   severity: Severity;
   severity_score?: number;
+  score?: number;
   category: string;
   owasp: string;
   cwe: string;
@@ -119,6 +119,8 @@ function Analyze() {
         if (json.success) {
           setRisks(json.data.risks || []);
           setSummary(json.data.summary || null);
+          sessionStorage.setItem("analysisRisks", JSON.stringify(json.data.risks || []));
+          sessionStorage.setItem("analysisSummary", JSON.stringify(json.data.summary || null));
         } else {
           setError(json.message || "Analysis failed.");
         }
@@ -136,7 +138,9 @@ function Analyze() {
   // ── Derived chart data ────────────────────────────────────────────────────
   const severityDistribution = useMemo(() => {
     const counts: Record<string, number> = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-    risks.forEach((r) => { counts[r.severity] = (counts[r.severity] || 0) + 1; });
+    risks.forEach((r) => {
+      counts[r.severity] = (counts[r.severity] || 0) + 1;
+    });
     return Object.entries(counts)
       .filter(([, v]) => v > 0)
       .map(([name, value]) => ({ name, value, color: SEVERITY_COLORS[name] }));
@@ -162,7 +166,7 @@ function Analyze() {
 
   const filtered = useMemo(
     () => (filter === "all" ? risks : risks.filter((r) => r.severity === filter)),
-    [risks, filter]
+    [risks, filter],
   );
 
   // ── Loading state ─────────────────────────────────────────────────────────
@@ -219,7 +223,8 @@ function Analyze() {
                   "text-destructive": summary.overallRiskLevel === "Critical",
                   "text-orange-400": summary.overallRiskLevel === "High",
                   "text-yellow-400": summary.overallRiskLevel === "Medium",
-                  "text-green-400": summary.overallRiskLevel === "Low" || summary.overallRiskLevel === "None",
+                  "text-green-400":
+                    summary.overallRiskLevel === "Low" || summary.overallRiskLevel === "None",
                 })}
               >
                 {summary.overallRiskLevel}
@@ -269,9 +274,7 @@ function Analyze() {
                   <Tooltip contentStyle={tooltipStyle} />
                   <Legend
                     iconType="circle"
-                    formatter={(v) => (
-                      <span className="text-xs text-muted-foreground">{v}</span>
-                    )}
+                    formatter={(v) => <span className="text-xs text-muted-foreground">{v}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -284,11 +287,7 @@ function Analyze() {
             <div className="mt-2 h-72">
               {topVulnerableComponents.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={topVulnerableComponents}
-                    layout="vertical"
-                    margin={{ left: 10 }}
-                  >
+                  <BarChart data={topVulnerableComponents} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       stroke="oklch(1 0 0 / 0.06)"
@@ -306,14 +305,9 @@ function Analyze() {
                       stroke="oklch(0.7 0.03 250)"
                       fontSize={11}
                       width={130}
-                      tickFormatter={(v: string) =>
-                        v.length > 16 ? v.slice(0, 15) + "…" : v
-                      }
+                      tickFormatter={(v: string) => (v.length > 16 ? v.slice(0, 15) + "…" : v)}
                     />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
-                    />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "oklch(1 0 0 / 0.04)" }} />
                     <Bar dataKey="risks" radius={[0, 6, 6, 0]} fill="url(#vulnGrad)" />
                     <defs>
                       <linearGradient id="vulnGrad" x1="0" y1="0" x2="1" y2="0">
@@ -347,7 +341,7 @@ function Analyze() {
                   "rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider transition-colors",
                   filter === f
                     ? "bg-primary/20 text-primary ring-1 ring-primary/40"
-                    : "bg-background/40 text-muted-foreground hover:text-foreground"
+                    : "bg-background/40 text-muted-foreground hover:text-foreground",
                 )}
               >
                 {f}
@@ -393,13 +387,19 @@ function Analyze() {
 function RiskRow({ risk }: { risk: Risk }) {
   const [expanded, setExpanded] = useState(false);
   const hasRecs = Array.isArray(risk.recommendation) && risk.recommendation.length > 0;
+  const displayScore =
+    typeof risk.severity_score === "number"
+      ? risk.severity_score
+      : typeof risk.score === "number"
+        ? risk.score
+        : "—";
 
   return (
     <>
       <tr
         className={cn(
           "border-b border-border/30 align-top transition-colors cursor-pointer",
-          expanded ? "bg-primary/5" : "hover:bg-primary/5"
+          expanded ? "bg-primary/5" : "hover:bg-primary/5",
         )}
         onClick={() => hasRecs && setExpanded((v) => !v)}
         title={hasRecs ? "Click to toggle recommendations" : undefined}
@@ -408,10 +408,14 @@ function RiskRow({ risk }: { risk: Risk }) {
         <td className="py-3 pr-3 max-w-[18rem]">
           <div className="flex items-start gap-2">
             {hasRecs && (
-              <span className={cn(
-                "mt-1 shrink-0 text-primary transition-transform duration-200",
-                expanded ? "rotate-90" : ""
-              )}>▶</span>
+              <span
+                className={cn(
+                  "mt-1 shrink-0 text-primary transition-transform duration-200",
+                  expanded ? "rotate-90" : "",
+                )}
+              >
+                ▶
+              </span>
             )}
             <div>
               <p className="font-medium leading-snug">{risk.name}</p>
@@ -425,9 +429,11 @@ function RiskRow({ risk }: { risk: Risk }) {
         <td className="py-3 pr-3 text-center">
           <div className="flex flex-col items-center gap-1">
             <span className="inline-flex items-center justify-center size-8 rounded-lg bg-primary/10 border border-primary/20 font-mono text-xs font-bold text-primary">
-              {risk.severity_score ?? "—"}
+              {displayScore}
             </span>
-            <span className="text-[9px] uppercase tracking-tighter text-muted-foreground">Score</span>
+            <span className="text-[9px] uppercase tracking-tighter text-muted-foreground">
+              Score
+            </span>
           </div>
         </td>
 

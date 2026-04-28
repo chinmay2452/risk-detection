@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
+import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/validation")({
@@ -73,7 +74,7 @@ function Validation() {
           return;
         }
 
-        const res = await fetch("http://localhost:5000/api/validate", {
+        const res = await fetch(apiUrl("/api/validate"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: archStr,
