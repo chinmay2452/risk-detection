@@ -117,10 +117,61 @@ function Analyze() {
         const json = await res.json();
 
         if (json.success) {
-          setRisks(json.data.risks || []);
-          setSummary(json.data.summary || null);
-          sessionStorage.setItem("analysisRisks", JSON.stringify(json.data.risks || []));
-          sessionStorage.setItem("analysisSummary", JSON.stringify(json.data.summary || null));
+          const fetchedRisks = json.data.risks || [];
+          const fetchedSummary = json.data.summary || null;
+
+          setRisks(fetchedRisks);
+          setSummary(fetchedSummary);
+          sessionStorage.setItem("analysisRisks", JSON.stringify(fetchedRisks));
+          sessionStorage.setItem("analysisSummary", JSON.stringify(fetchedSummary));
+
+          // Auto-generate a report entry
+          if (fetchedSummary) {
+            const reportId = `RPT-${Math.floor(1000 + Math.random() * 9000)}`;
+            const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            let score = 100 - (fetchedSummary.critical * 20 + fetchedSummary.high * 10 + fetchedSummary.medium * 5 + fetchedSummary.low * 2);
+            if (score < 0) score = 0;
+            
+            let grade = 'A';
+            if (score < 90) grade = 'B';
+            if (score < 70) grade = 'C';
+            if (score < 50) grade = 'D';
+
+            // Gather extra data for the comprehensive PDF report
+            let architectureData = null;
+            let validationResult = null;
+            try {
+              const archStr = sessionStorage.getItem("architectureData");
+              if (archStr) architectureData = JSON.parse(archStr);
+              
+              const valStr = sessionStorage.getItem("validationResult");
+              if (valStr) validationResult = JSON.parse(valStr);
+            } catch(e) {}
+
+            const newReport = {
+              id: reportId,
+              project: "Current Model",
+              date: dateStr,
+              score,
+              grade,
+              critical: fetchedSummary.critical || 0,
+              high: fetchedSummary.high || 0,
+              medium: fetchedSummary.medium || 0,
+              low: fetchedSummary.low || 0,
+              architectureData,
+              validationResult,
+              risks: fetchedRisks
+            };
+
+            const existingReportsStr = localStorage.getItem("sentinelReports");
+            let reportsList = existingReportsStr ? JSON.parse(existingReportsStr) : [];
+            // Prevent duplicates if we just remounted the component and re-fetched the same analysis (check latest report score/counts)
+            if (reportsList.length === 0 || reportsList[0].score !== score || reportsList[0].critical !== fetchedSummary.critical) {
+              reportsList.unshift(newReport);
+              localStorage.setItem("sentinelReports", JSON.stringify(reportsList));
+            }
+          }
         } else {
           setError(json.message || "Analysis failed.");
         }
