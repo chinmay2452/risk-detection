@@ -25,6 +25,7 @@ import {
 import { GlassCard } from "@/components/cyber/GlassCard";
 import { KpiCard } from "@/components/cyber/KpiCard";
 import { SeverityPill } from "@/components/cyber/SeverityPill";
+import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/analyze")({
@@ -107,7 +108,7 @@ function Analyze() {
 
         const architectureData = JSON.parse(raw);
 
-        const res = await fetch("http://localhost:5000/api/analyze", {
+        const res = await fetch(apiUrl("/api/analyze"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(architectureData),

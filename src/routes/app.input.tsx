@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, type DragEvent } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
+import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/input")({
@@ -134,7 +135,7 @@ function DropZoneCard({
     formData.append("files", selectedFile);
 
     try {
-      const response = await fetch("http://localhost:5000/api/upload", {
+      const response = await fetch(apiUrl("/api/upload"), {
         method: "POST",
         body: formData,
       });

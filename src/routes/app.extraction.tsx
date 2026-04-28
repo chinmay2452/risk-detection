@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/cyber/GlassCard";
+import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { extractedEntities } from "@/lib/mock-data";
 
@@ -46,7 +47,7 @@ function Extraction() {
         const inputType = sessionStorage.getItem("inputType") || "text";
         const filePath = sessionStorage.getItem("filePath");
         if (extractedText) {
-          const res = await fetch("http://localhost:5000/api/extract", {
+          const res = await fetch(apiUrl("/api/extract"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ extractedText, inputType, filePath })

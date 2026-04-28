@@ -1,6 +1,7 @@
-const pdfParse = require('pdf-parse');
 const fs = require('fs');
 const Tesseract = require('tesseract.js');
+// pdf-parse is lazy-loaded inside the PDF branch to avoid a known startup crash
+// where top-level require() triggers an internal self-test that exits the process.
 
 class FileService {
   /**
@@ -16,6 +17,7 @@ class FileService {
 
     try {
       if (file.mimetype === 'application/pdf') {
+        const pdfParse = require('pdf-parse');
         const dataBuffer = fs.readFileSync(file.path);
         const data = await pdfParse(dataBuffer);
         result.extractedText = data.text;
